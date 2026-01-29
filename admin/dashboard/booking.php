@@ -70,7 +70,7 @@
                                 <label>Type</label>
                                 <select name="type">
                                     <option>Hotel</option>
-                                    <option>Villa</option>
+                                    <option></option>
                                     <option>Apartment</option>
                                     <option>Resort</option>
                                 </select>

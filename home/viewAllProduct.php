@@ -1,182 +1,205 @@
+<?php
+session_start();
+require_once '../admin/config.php'; 
+
+// Check if user is logged in for the header
+$isLoggedIn = isset($_SESSION['accountID']);
+$profilePic = 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'; 
+
+if ($isLoggedIn) {
+    $accID = $_SESSION['accountID'];
+    $userQuery = "SELECT profile FROM userinfo WHERE accountID = '$accID'";
+    $userResult = mysqli_query($conn, $userQuery);
+    if ($userResult && $userData = mysqli_fetch_assoc($userResult)) {
+        if (!empty($userData['profile'])) {
+            $profilePic = (filter_var($userData['profile'], FILTER_VALIDATE_URL)) 
+                          ? $userData['profile'] 
+                          : "uploads/profile/" . htmlspecialchars($userData['profile']);
+        }
+    }
+}
+
+// 1. Capture Filters
+$searchTerm = isset($_GET['search']) ? mysqli_real_escape_string($conn, $_GET['search']) : '';
+$filterType = isset($_GET['type']) ? mysqli_real_escape_string($conn, $_GET['type']) : '';
+$filterCountry = isset($_GET['country']) ? mysqli_real_escape_string($conn, $_GET['country']) : '';
+
+// 2. Define Popular Places for Dropdown
+$popularCountries = ['Cambodia', 'Thailand', 'Vietnam', 'Japan', 'France', 'USA'];
+
+// 3. Build Query with Multi-Field Location Search
+$query = "SELECT spot.*, address.country, address.province, address.district, address.street 
+          FROM spot 
+          JOIN address ON spot.addressID = address.addressID 
+          WHERE 1=1";
+
+if (!empty($searchTerm)) {
+    $query .= " AND (spot.name LIKE '%$searchTerm%' 
+                OR address.country LIKE '%$searchTerm%' 
+                OR address.province LIKE '%$searchTerm%' 
+                OR address.district LIKE '%$searchTerm%' 
+                OR address.street LIKE '%$searchTerm%')";
+}
+
+// Ensure filter matches the 'type' column exactly
+if (!empty($filterType)) {
+    $query .= " AND spot.type = '$filterType'";
+}
+
+if (!empty($filterCountry)) {
+    $query .= " AND address.country = '$filterCountry'";
+}
+
+$result = mysqli_query($conn, $query);
+$spots = mysqli_fetch_all($result, MYSQLI_ASSOC);
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BookingMaster | Explore All Destinations</title>
+    <title>Explore Destinations | BookingMaster</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
-                    colors: { brand: '#3B82F6', dark: '#0F172A' }
+                    colors: { brand: '#3B82F6', dark: '#0F172A', slateBg: '#F8FAFC' }
                 }
             }
         }
+        function toggleDropdown() {
+            document.getElementById('profile-dropdown').classList.toggle('hidden');
+        }
     </script>
-    <style>
-        .glass {
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-        }
-        .card-shadow {
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.05);
-        }
-        .filter-chip.active {
-            @apply bg-brand text-white border-brand;
-        }
-    </style>
 </head>
-<body class="bg-slate-50 text-slate-900 font-sans antialiased">
+<body class="bg-slateBg font-sans text-slate-900 antialiased">
 
-    <nav class="sticky top-0 z-50 glass border-b border-slate-200">
-        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
-            <a href="index.php" class="flex items-center space-x-2 text-2xl font-extrabold text-brand tracking-tighter">
-                <i class="bi bi-geo-alt-fill"></i>
+    <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <a href="index.php" class="flex items-center gap-2 text-2xl font-extrabold tracking-tighter text-dark">
+                <div class="bg-brand p-1.5 rounded-lg text-white"><i class="bi bi-geo-alt-fill"></i></div>
                 <span>BookingMaster</span>
             </a>
-            
-            <div class="hidden md:flex items-center space-x-4">
-                <div class="relative">
-                    <input type="text" placeholder="Search destinations..." class="pl-10 pr-4 py-2 bg-slate-100 border-none rounded-full text-sm w-64 focus:ring-2 focus:ring-brand/20 transition-all">
-                    <i class="bi bi-search absolute left-4 top-2.5 text-slate-400"></i>
-                </div>
-                <a href="#" class="bg-brand text-white px-6 py-2 rounded-full font-bold text-sm shadow-lg shadow-blue-200">Sign In</a>
+
+             <div class="flex items-center space-x-6">
+                <?php if ($isLoggedIn): ?>
+                    <div class="relative">
+                        <button onclick="toggleDropdown()" class="flex items-center focus:outline-none" aria-label="User menu">
+                            <div class="w-10 h-10 rounded-full overflow-hidden border-2 border-brand/20 hover:border-brand transition-all shadow-sm">
+                                <img src="<?= $profilePic ?>" alt="Profile" class="w-full h-full object-cover">
+                            </div>
+                        </button>
+
+                        <div id="profile-dropdown" class="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-50">
+                            <div class="px-4 py-3 border-b border-slate-50">
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Signed in as</p>
+                                <p class="text-xs font-bold text-slate-700 truncate"><?= htmlspecialchars($userEmail) ?></p>
+                            </div>
+                            <a href="userDashboard.php" class="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 hover:text-brand transition">
+                                <i class="bi bi-speedometer2 text-lg"></i> Dashboard
+                            </a>
+                            <hr class="my-1 border-slate-50">
+                            <a href="../profile/login/logout.php" class="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-red-500 hover:bg-red-50 transition">
+                                <i class="bi bi-box-arrow-right text-lg"></i> Logout
+                            </a>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <a href="../profile/login/index.php" class="text-sm font-bold text-slate-700 hover:text-brand transition flex items-center gap-1">
+                        <i class="bi bi-person-circle text-lg"></i> Sign In
+                    </a>
+                <?php endif; ?>
+
             </div>
         </div>
     </nav>
 
-    <header class="bg-white border-b border-slate-100 py-12">
-        <div class="container mx-auto px-6">
-            <nav class="flex mb-4 text-xs font-bold uppercase tracking-widest text-slate-400">
-                <a href="index.php" class="hover:text-brand transition">Home</a>
-                <span class="mx-2">/</span>
-                <span class="text-slate-600">All Destinations</span>
-            </nav>
-            <h1 class="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight">Explore the World</h1>
-            <p class="text-slate-500 mt-2 text-lg">Showing 248 luxury stays and curated packages found globally.</p>
+    <header class="bg-white border-b border-slate-100 py-10">
+        <div class="max-w-7xl mx-auto px-6">
+            <form action="" method="GET" class="flex flex-col md:flex-row gap-4 mb-8">
+                <div class="flex-1 relative">
+                    <i class="bi bi-search absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" name="search" value="<?= htmlspecialchars($searchTerm) ?>" placeholder="Search address, city, or resort name..." class="w-full bg-slate-50 border-none rounded-2xl py-5 pl-14 pr-4 font-semibold shadow-sm focus:ring-2 focus:ring-brand">
+                </div>
+                <div class="w-full md:w-64 relative">
+                    <select name="country" onchange="this.form.submit()" class="w-full bg-slate-50 border-none rounded-2xl py-5 px-6 font-bold appearance-none shadow-sm cursor-pointer">
+                        <option value="">Popular Countries</option>
+                        <?php foreach($popularCountries as $c): ?>
+                            <option value="<?= $c ?>" <?= ($filterCountry == $c) ? 'selected' : '' ?>><?= $c ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <button type="submit" class="bg-brand text-white px-10 py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-blue-100">Search</button>
+            </form>
+
+            <div class="flex items-center gap-4 overflow-x-auto pb-2 no-scrollbar">
+                <a href="viewAllProduct.php?country=<?= $filterCountry ?>&search=<?= $searchTerm ?>" 
+                   class="px-8 py-3 rounded-full text-sm font-bold whitespace-nowrap transition <?= empty($filterType) ? 'bg-dark text-white shadow-lg' : 'bg-slate-50 text-slate-500 hover:bg-slate-100' ?>">
+                    All Destinantions
+                </a>
+                <?php foreach(['Travel-Packages','Luxury-Hotels', 'Vehicle-Rental', 'Room-Rentals','Tour-Guides'] as $type): ?>
+                    <a href="viewAllProduct.php?type=<?= $type ?>&country=<?= $filterCountry ?>&search=<?= $searchTerm ?>" 
+                       class="px-8 py-3 rounded-full text-sm font-bold whitespace-nowrap transition <?= ($filterType == $type) ? 'bg-dark text-white shadow-lg' : 'bg-slate-50 text-slate-500 hover:bg-slate-100' ?>">
+                        <?= $type ?>
+                    </a>
+                <?php endforeach; ?>
+            </div>
         </div>
     </header>
 
-    <main class="container mx-auto px-6 py-10">
-        <div class="flex flex-col lg:flex-row gap-10">
-            
-            <aside class="w-full lg:w-72 space-y-8">
-                <div>
-                    <h3 class="font-extrabold text-lg mb-4">Categories</h3>
-                    <div class="flex flex-wrap lg:flex-col gap-2">
-                        <button class="filter-chip px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-left hover:border-brand active">All Categories</button>
-                        <button class="filter-chip px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-left hover:border-brand">Luxury Hotels</button>
-                        <button class="filter-chip px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-left hover:border-brand">Travel Packages</button>
-                        <button class="filter-chip px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-left hover:border-brand">Rental Vehicles</button>
-                    </div>
-                </div>
-
-                <div>
-                    <h3 class="font-extrabold text-lg mb-4">Price Range</h3>
-                    <input type="range" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand">
-                    <div class="flex justify-between text-xs font-bold text-slate-400 mt-2">
-                        <span>$100</span>
-                        <span>$5,000+</span>
-                    </div>
-                </div>
-
-                <div>
-                    <h3 class="font-extrabold text-lg mb-4">Rating</h3>
-                    <div class="space-y-2">
-                        <?php for($i=5; $i>=3; $i--): ?>
-                        <label class="flex items-center space-x-3 cursor-pointer group">
-                            <input type="checkbox" class="w-5 h-5 rounded border-slate-300 text-brand focus:ring-brand">
-                            <span class="text-sm font-medium text-slate-600 group-hover:text-slate-900">
-                                <?= $i ?> Stars & Up 
-                                <span class="text-yellow-400 ml-1"><i class="bi bi-star-fill"></i></span>
+    <main class="max-w-7xl mx-auto px-6 py-12">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+            <?php if (count($spots) > 0): ?>
+                <?php foreach ($spots as $spot): 
+                    $img = (filter_var($spot['photo'], FILTER_VALIDATE_URL)) ? $spot['photo'] : "uploads/" . $spot['photo'];
+                    $isAvailable = (strtolower($spot['status']) == 'available');
+                ?>
+                <div class="bg-white rounded-[2.5rem] overflow-hidden border border-slate-100 group flex flex-col">
+                    <div class="relative h-64 overflow-hidden">
+                        <img src="<?= $img ?>" class="w-full h-full object-cover group-hover:scale-110 transition duration-700">
+                        <div class="absolute bottom-5 left-5">
+                            <span class="flex items-center gap-1.5 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest <?= $isAvailable ? 'bg-green-500 text-white' : 'bg-red-500 text-white' ?>">
+                                <i class="bi <?= $isAvailable ? 'bi-check-circle-fill' : 'bi-x-circle-fill' ?>"></i>
+                                <?= $spot['status'] ?>
                             </span>
-                        </label>
-                        <?php endfor; ?>
-                    </div>
-                </div>
-            </aside>
-
-            <div class="flex-1">
-                <div class="flex justify-between items-center mb-8">
-                    <p class="text-sm font-bold text-slate-400 uppercase tracking-widest">Sort by: <span class="text-slate-900 ml-2">Recommended <i class="bi bi-chevron-down ml-1"></i></span></p>
-                    <div class="flex space-x-2">
-                        <button class="p-2 bg-white border border-slate-200 rounded-lg text-brand"><i class="bi bi-grid-fill"></i></button>
-                        <button class="p-2 bg-white border border-slate-200 rounded-lg text-slate-400"><i class="bi bi-list"></i></button>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-                    <?php
-                    // Simulated Data Array
-                    $items = [
-                        ['Paris Luxury Stay', 'Hotel', '$1,200', '4.9', 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=600'],
-                        ['Venice Getaway', 'Package', '$550', '4.8', 'https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?auto=format&fit=crop&w=600'],
-                        ['Dubai Desert Safari', 'Tour', '$800', '5.0', 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=600'],
-                        ['Tokyo Neon Night', 'Package', '$950', '4.7', 'https://images.unsplash.com/photo-1500835595353-b0ad2e58b8df?auto=format&fit=crop&w=600'],
-                        ['New York Skyline', 'Hotel', '$620', '4.6', 'https://images.unsplash.com/photo-1525625239911-4f5d7222eeed?auto=format&fit=crop&w=600'],
-                        ['Bali Ocean Villa', 'Resort', '$1,500', '4.9', 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=600']
-                    ];
-
-                    foreach ($items as $item): ?>
-                    <div class="bg-white rounded-[2rem] overflow-hidden card-shadow hover:-translate-y-2 transition-all duration-300 group">
-                        <div class="relative h-60 overflow-hidden">
-                            <img src="<?= $item[4] ?>" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
-                            <button class="absolute top-4 right-4 w-10 h-10 bg-white/80 backdrop-blur rounded-full flex items-center justify-center text-slate-400 hover:text-red-500 transition">
-                                <i class="bi bi-heart-fill"></i>
-                            </button>
-                            <span class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest"><?= $item[1] ?></span>
-                        </div>
-                        <div class="p-6">
-                            <div class="flex justify-between items-start mb-2">
-                                <h3 class="font-bold text-lg leading-tight text-slate-900"><?= $item[0] ?></h3>
-                                <div class="flex items-center text-yellow-400 font-bold text-sm">
-                                    <i class="bi bi-star-fill mr-1"></i> <?= $item[3] ?>
-                                </div>
-                            </div>
-                            <div class="flex items-center text-slate-400 text-xs mb-6">
-                                <i class="bi bi-geo-alt mr-1"></i> Worldwide Destination
-                            </div>
-                            <div class="flex justify-between items-center pt-4 border-t border-slate-50">
-                                <div>
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase">Per Night</p>
-                                    <span class="text-xl font-extrabold text-slate-900"><?= $item[2] ?></span>
-                                </div>
-                                <button class="bg-dark text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-brand transition-all">Book Now</button>
-                            </div>
                         </div>
                     </div>
-                    <?php endforeach; ?>
+                    
+                    <div class="p-8 flex-1 flex flex-col">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2"><?= htmlspecialchars($spot['province']) ?>, <?= htmlspecialchars($spot['country']) ?></p>
+                        <h3 class="text-xl font-extrabold text-slate-900 mb-2"><?= htmlspecialchars($spot['name']) ?></h3>
+                        <p class="text-xs text-slate-400 mb-6 line-clamp-1"><?= htmlspecialchars($spot['street']) ?>, <?= htmlspecialchars($spot['district']) ?></p>
+                        
+                        <div class="mt-auto pt-6 border-t border-slate-50 flex justify-between items-center">
+                            <div>
+                                <p class="text-[9px] font-bold text-slate-300 uppercase">Rate</p>
+                                <span class="text-2xl font-black text-slate-900">$<?= number_format($spot['price'], 2) ?></span>
+                            </div>
+                            <?php if($isAvailable): ?>
+                                <a href="productDetail.php?id=<?= $spot['spotID'] ?>" class="bg-brand text-white px-8 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-blue-600 transition shadow-lg shadow-blue-100">
+                                    View Details
+                                </a>
+                            <?php else: ?>
+                                <button disabled class="bg-slate-100 text-slate-400 px-8 py-3 rounded-2xl font-black text-[11px] uppercase tracking-widest cursor-not-allowed">
+                                    Unavailable
+                                </button>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                 </div>
-
-                <div class="mt-16 flex justify-center space-x-2">
-                    <button class="w-12 h-12 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-white hover:shadow-lg transition"><i class="bi bi-chevron-left"></i></button>
-                    <button class="w-12 h-12 rounded-xl bg-brand text-white font-bold shadow-lg shadow-blue-200">1</button>
-                    <button class="w-12 h-12 rounded-xl border border-slate-200 font-bold hover:bg-white transition">2</button>
-                    <button class="w-12 h-12 rounded-xl border border-slate-200 font-bold hover:bg-white transition">3</button>
-                    <button class="w-12 h-12 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-white hover:shadow-lg transition"><i class="bi bi-chevron-right"></i></button>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="col-span-full py-20 text-center">
+                    <p class="text-slate-400 font-bold uppercase tracking-widest">No spots match your search</p>
                 </div>
-            </div>
+            <?php endif; ?>
         </div>
     </main>
-
-    <footer class="bg-dark text-white pt-20 pb-10 mt-20">
-        <div class="container mx-auto px-6 text-center">
-            <a href="#" class="text-2xl font-extrabold text-brand mb-6 block">BookingMaster</a>
-            <div class="flex justify-center space-x-6 mb-10">
-                <a href="#" class="text-gray-400 hover:text-white transition">About</a>
-                <a href="#" class="text-gray-400 hover:text-white transition">Destinations</a>
-                <a href="#" class="text-gray-400 hover:text-white transition">Privacy Policy</a>
-                <a href="#" class="text-gray-400 hover:text-white transition">Support</a>
-            </div>
-            <p class="text-gray-500 text-sm border-t border-slate-800 pt-10">&copy; 2026 BookingMaster. Explore with confidence.</p>
-        </div>
-    </footer>
 
 </body>
 </html>

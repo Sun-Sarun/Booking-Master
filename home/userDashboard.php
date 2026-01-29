@@ -1,224 +1,358 @@
+<?php
+session_start();
+require_once '../admin/config.php'; 
+
+if (!isset($_SESSION['accountID'])) {
+    header("Location: ../profile/login/index.php");
+    exit();
+}
+
+$accID = $_SESSION['accountID'];
+$message = "";
+
+// 1. INITIAL FETCH (To get userID for updates)
+$initialUser = mysqli_fetch_assoc(mysqli_query($conn, "SELECT userID FROM userinfo WHERE accountID = '$accID'"));
+$userID = $initialUser['userID'];
+
+// 2. HANDLE UPDATES (POST REQUESTS)
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    
+    // Logic for Profile Update
+    if (isset($_POST['update_profile'])) {
+        $fname = mysqli_real_escape_string($conn, $_POST['FName']);
+        $lname = mysqli_real_escape_string($conn, $_POST['LName']);
+        $phone = mysqli_real_escape_string($conn, $_POST['phone']);
+        $address = mysqli_real_escape_string($conn, $_POST['address']);
+
+        $profileName = $_POST['current_profile']; 
+        if (!empty($_FILES['profile_img']['name'])) {
+            $targetDir = "../uploads/profile/"; 
+            if (!is_dir($targetDir)) mkdir($targetDir, 0777, true);
+            $profileName = time() . "_" . basename($_FILES['profile_img']['name']);
+            move_uploaded_file($_FILES['profile_img']['tmp_name'], $targetDir . $profileName);
+        }
+
+        $sql = "UPDATE userinfo SET FName='$fname', LName='$lname', phone='$phone', address='$address', profile='$profileName' WHERE accountID='$accID'";
+        if (mysqli_query($conn, $sql)) {
+            $message = "Profile updated successfully.";
+        }
+    }
+
+    // Logic for Payment Update
+    if (isset($_POST['update_payment'])) {
+        $uID = mysqli_real_escape_string($conn, $_POST['userID']);
+        $pType = mysqli_real_escape_string($conn, $_POST['paymentType']);
+        $cCode = mysqli_real_escape_string($conn, $_POST['cardCode']);
+        $exp = mysqli_real_escape_string($conn, $_POST['expireDate']);
+        $cvv = mysqli_real_escape_string($conn, $_POST['cvv']);
+
+        $checkPayment = mysqli_query($conn, "SELECT paymentID FROM paymentInfo WHERE userID = '$uID'");
+        
+        if (mysqli_num_rows($checkPayment) > 0) {
+            $paySql = "UPDATE paymentInfo SET paymentType='$pType', cardCode='$cCode', expireDate='$exp', cvv='$cvv' WHERE userID='$uID'";
+        } else {
+            $paySql = "INSERT INTO paymentInfo (userID, paymentType, cardCode, expireDate, cvv) VALUES ('$uID', '$pType', '$cCode', '$exp', '$cvv')";
+        }
+
+        if (mysqli_query($conn, $paySql)) {
+            $message = "Payment method synchronized successfully.";
+        } else {
+            $message = "Error updating payment: " . mysqli_error($conn);
+        }
+    }
+}
+
+// 3. FINAL DATA RETRIEVAL (Fetch fresh data for display)
+$user = mysqli_fetch_assoc(mysqli_query($conn, "SELECT * FROM userinfo WHERE accountID = '$accID'"));
+$payment = mysqli_fetch_assoc(mysqli_query($conn, "SELECT * FROM paymentInfo WHERE userID = '$userID'"));
+
+// Statistics
+$stats = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) as count, SUM(totalPrice) as total FROM booking WHERE accountID = '$accID'"));
+$totalBookings = $stats['count'] ?? 0;
+$totalSpent = $stats['total'] ?? 0.00;
+
+// Last Activity
+$lastBooking = mysqli_fetch_assoc(mysqli_query($conn, "SELECT purchaseDate FROM booking WHERE accountID = '$accID' ORDER BY purchaseDate DESC LIMIT 1"));
+$lastDate = $lastBooking['purchaseDate'] ?? 'No activity';
+
+// Booking History
+$bookingResult = mysqli_query($conn, "SELECT b.*, s.name, s.photo, a.province, a.street, a.houseNumber 
+                 FROM booking b 
+                 JOIN spot s ON b.spotID = s.spotID
+                 JOIN address a ON s.addressID = a.addressID
+                 WHERE b.accountID = '$accID' ORDER BY b.purchaseDate DESC");
+
+// Profile Picture logic
+// Define a default placeholder first
+$profilePic = 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
+
+if (!empty($user['profile'])) {
+    // Check if the database value is a full URL
+    if (filter_var($user['profile'], FILTER_VALIDATE_URL)) {
+        $profilePic = $user['profile'];
+    } else {
+        // If it's a filename, check multiple possible local paths
+        $paths = [
+            "uploads/profile/" . $user['profile'], 
+            "../uploads/profile/" . $user['profile']
+        ];
+        
+        foreach ($paths as $p) {
+            if (file_exists($p)) {
+                $profilePic = $p;
+                break; 
+            }
+        }
+    }
+}
+
+
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BookingMaster | Professional Dashboard</title>
+    <title>Customer Dashboard | BookingMaster</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
-                    colors: { brand: '#3B82F6', dark: '#0F172A' }
+                    colors: { brand: '#3B82F6', dark: '#0F172A', slateBg: '#F8FAFC' }
                 }
             }
         }
+        function navigateTo(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+            document.getElementById(tabId).classList.remove('hidden');
+            document.querySelectorAll('.nav-link').forEach(l => {
+                l.classList.remove('bg-white/10', 'text-white');
+                l.classList.add('text-slate-400');
+            });
+            event.currentTarget.classList.add('bg-white/10', 'text-white');
+        }
     </script>
-    <style>
-        .glass-card {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-        .sidebar-gradient {
-            background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
-        }
-        /* Hide scrollbar for Chrome, Safari and Opera */
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .active-link { @apply bg-brand text-white shadow-lg shadow-blue-500/30; }
-    </style>
 </head>
-<body class="bg-slate-50 font-sans antialiased text-slate-900">
-
-    <header class="lg:hidden flex items-center justify-between p-4 bg-white border-b">
-        <div class="flex items-center space-x-2 text-brand font-bold text-xl">
-            <i class="bi bi-geo-alt-fill"></i>
-            <span>BookingMaster</span>
-        </div>
-        <button onclick="toggleSidebar()" class="text-2xl text-slate-600">
-            <i class="bi bi-list"></i>
-        </button>
-    </header>
+<body class="bg-slateBg font-sans antialiased text-slate-900">
 
     <div class="flex min-h-screen">
-        <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-72 sidebar-gradient text-slate-300 transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 ease-in-out shadow-2xl">
-            <div class="p-8">
-                <div class="flex items-center space-x-3 text-white text-2xl font-extrabold tracking-tight mb-10">
-                    <div class="bg-brand p-2 rounded-xl shadow-lg shadow-blue-500/20">
-                        <i class="bi bi-geo-alt-fill text-xl"></i>
-                    </div>
+        <aside class="w-72 bg-dark text-slate-400 p-8 hidden lg:flex flex-col fixed h-full z-50">
+            <a href="index.php">
+                <div class="flex items-center gap-3 text-white text-2xl font-extrabold mb-12">
+                    <div class="bg-brand p-2 rounded-xl"><i class="bi bi-geo-alt-fill"></i></div>
                     <span>BookingMaster</span>
                 </div>
-
-                <nav class="space-y-2">
-                    <p class="text-[10px] uppercase tracking-widest font-bold text-slate-500 mb-4 px-4">Menu</p>
-                    <a href="#" class="flex items-center space-x-3 px-4 py-3 rounded-2xl bg-brand text-white shadow-lg shadow-blue-500/30 transition-all">
-                        <i class="bi bi-grid-1x2-fill"></i>
-                        <span class="font-semibold">Dashboard</span>
-                    </a>
-                    <a href="#" class="flex items-center space-x-3 px-4 py-3 rounded-2xl hover:bg-white/5 hover:text-white transition-all">
-                        <i class="bi bi-calendar-event"></i>
-                        <span class="font-medium">My Bookings</span>
-                    </a>
-                    <a href="#" class="flex items-center space-x-3 px-4 py-3 rounded-2xl hover:bg-white/5 hover:text-white transition-all">
-                        <i class="bi bi-wallet2"></i>
-                        <span class="font-medium">Transactions</span>
-                    </a>
-                    <a href="#" class="flex items-center space-x-3 px-4 py-3 rounded-2xl hover:bg-white/5 hover:text-white transition-all">
-                        <i class="bi bi-chat-dots"></i>
-                        <span class="font-medium">Messages</span>
-                    </a>
-                    
-                    <p class="text-[10px] uppercase tracking-widest font-bold text-slate-500 mt-10 mb-4 px-4">Settings</p>
-                    <a href="#" class="flex items-center space-x-3 px-4 py-3 rounded-2xl hover:bg-white/5 hover:text-white transition-all">
-                        <i class="bi bi-person-gear"></i>
-                        <span class="font-medium">Profile</span>
-                    </a>
-                    <a href="#" class="flex items-center space-x-3 px-4 py-3 rounded-2xl hover:bg-red-500/10 hover:text-red-400 transition-all">
-                        <i class="bi bi-box-arrow-right"></i>
-                        <span class="font-medium">Logout</span>
-                    </a>
-                </nav>
-            </div>
-            
-            <div class="absolute bottom-8 left-8 right-8 p-6 bg-white/5 rounded-[2rem] border border-white/10 text-center">
-                <p class="text-xs font-semibold mb-3">Upgrade to Premium</p>
-                <button class="w-full bg-white text-dark py-2 rounded-xl text-sm font-bold hover:bg-slate-100 transition">Go Pro</button>
-            </div>
+            </a>
+            <nav class="flex-1 space-y-2">
+                <button onclick="navigateTo('tab-overview')" class="nav-link w-full flex items-center gap-4 px-5 py-3.5 rounded-2xl bg-white/10 text-white font-semibold">
+                    <i class="bi bi-grid-1x2"></i><span>Overview</span>
+                </button>
+                <button onclick="navigateTo('tab-bookings')" class="nav-link w-full flex items-center gap-4 px-5 py-3.5 rounded-2xl hover:bg-white/5 font-semibold">
+                    <i class="bi bi-journal-bookmark"></i><span>Bookings</span>
+                </button>
+                <button onclick="navigateTo('tab-profile')" class="nav-link w-full flex items-center gap-4 px-5 py-3.5 rounded-2xl hover:bg-white/5 font-semibold">
+                    <i class="bi bi-person-circle"></i><span>Profile</span>
+                </button>
+                <button onclick="navigateTo('tab-payment')" class="nav-link w-full flex items-center gap-4 px-5 py-3.5 rounded-2xl hover:bg-white/5 font-semibold">
+                    <i class="bi bi-credit-card"></i><span>Billing</span>
+                </button>
+            </nav>
+            <a href="../profile/login/index.php" class="flex items-center gap-4 px-5 py-3 text-red-400 font-bold hover:bg-red-500/10 rounded-xl">
+                <i class="bi bi-power"></i><span>Logout</span>
+            </a>
         </aside>
 
-        <main class="flex-1 p-6 lg:p-10 no-scrollbar overflow-y-auto">
+        <main class="flex-1 ml-0 lg:ml-72 p-6 lg:p-12">
             
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
-                <div>
-                    <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Dashboard Overview</h1>
-                    <p class="text-slate-500">Welcome back, Alex! Here’s what’s happening today.</p>
+            <?php if($message): ?>
+                <div class="mb-8 p-4 bg-brand text-white rounded-2xl font-bold shadow-lg flex items-center gap-3">
+                    <i class="bi bi-check-circle-fill"></i> <?= htmlspecialchars($message) ?>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <div class="relative">
-                        <i class="bi bi-bell text-xl text-slate-400"></i>
-                        <span class="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-slate-50"></span>
+            <?php endif; ?>
+
+            <div id="tab-overview" class="tab-content space-y-8">
+                <div class="flex justify-between items-end">
+                    <div>
+                        <p class="text-slate-400 font-bold text-sm uppercase tracking-widest">Dashboard</p>
+                        <h1 class="text-4xl font-black">Welcome, <?= htmlspecialchars($user['FName']) ?></h1>
                     </div>
-                    <div class="flex items-center space-x-3 bg-white p-2 pr-4 rounded-2xl border border-slate-200 shadow-sm cursor-pointer hover:shadow-md transition">
-                        <img src="https://i.pravatar.cc/150?u=alex" class="w-10 h-10 rounded-xl object-cover" alt="Avatar">
+                    <img src="<?= $profilePic ?>" 
+     class="w-16 h-16 rounded-2xl object-cover border-4 border-white shadow-md"
+     alt="User Profile"
+     onerror="this.src='https://cdn-icons-png.flaticon.com/512/3135/3135715.png'">
+                    
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-white p-8 rounded-[2rem] border shadow-sm">
+                        <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-2">Total Spent</p>
+                        <h3 class="text-3xl font-black text-brand">$<?= number_format($totalSpent, 2) ?></h3>
+                    </div>
+                    <div class="bg-white p-8 rounded-[2rem] border shadow-sm">
+                        <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-2">Trips</p>
+                        <h3 class="text-3xl font-black"><?= $totalBookings ?></h3>
+                    </div>
+                    <div class="bg-white p-8 rounded-[2rem] border shadow-sm">
+                        <p class="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-2">Last Activity</p>
+                        <h3 class="text-sm font-bold"><?= $lastDate ?></h3>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 rounded-[3rem] p-12 text-white flex justify-between items-center relative overflow-hidden group">
+                    <div class="z-10">
+                        <h2 class="text-3xl font-bold mb-2">Explore New Places</h2>
+                        <p class="text-slate-400 mb-8">Ready for your next trip? Thousands of spots are waiting.</p>
+                        <a href="../index.php" class="bg-brand px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-600 transition">Book New Spot</a>
+                    </div>
+                    <i class="bi bi-airplane-engines absolute -right-10 -bottom-10 text-[15rem] text-white/5 -rotate-12 transition-transform group-hover:scale-110"></i>
+                </div>
+            </div>
+
+            <div id="tab-bookings" class="tab-content hidden space-y-6">
+                <h2 class="text-2xl font-black mb-8">My History</h2>
+                <?php if(mysqli_num_rows($bookingResult) > 0): ?>
+                    <?php while($row = mysqli_fetch_assoc($bookingResult)): ?>
+                        <div class="bg-white p-6 rounded-[2.5rem] border border-slate-100 flex flex-col md:flex-row gap-8 hover:shadow-xl transition-all group">
+                            <div class="md:w-56 h-40 relative flex-shrink-0">
+                                <img src="<?= (filter_var($row['photo'], FILTER_VALIDATE_URL)) ? $row['photo'] : (file_exists('uploads/'.$row['photo']) ? 'uploads/'.$row['photo'] : '../uploads/'.$row['photo']) ?>"
+                                     class="w-full h-full object-cover rounded-[1.5rem] bg-slate-100"
+                                     onerror="this.src='https://placehold.co/600x400?text=No+Image'">
+                                <div class="absolute top-3 left-3 bg-white/90 backdrop-blur px-3 py-1 rounded-lg text-[10px] font-black text-brand uppercase tracking-tighter">Stay</div>
+                            </div>
+                            <div class="flex-1 py-2">
+                                <div class="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h4 class="text-xl font-extrabold text-slate-900"><?= htmlspecialchars($row['name']) ?></h4>
+                                        <p class="text-xs font-bold text-slate-400 mt-1 uppercase tracking-tighter">
+                                            <i class="bi bi-geo-alt"></i> <?= htmlspecialchars($row['houseNumber'] . " " . $row['street'] . ", " . $row['province']) ?>
+                                        </p>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="text-[10px] font-black text-slate-300 block uppercase">Reference</span>
+                                        <span class="text-xs font-mono font-bold">#BK-<?= sprintf('%04d', $row['bookingID']) ?></span>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-3 gap-6 pt-6 border-t border-slate-50">
+                                    <div><p class="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Check In</p><p class="text-sm font-bold"><?= date('M d, Y', strtotime($row['checkinDate'])) ?></p></div>
+                                    <div><p class="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Units</p><p class="text-sm font-bold"><?= $row['unit'] ?> Pax</p></div>
+                                    <div><p class="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Paid Amount</p><p class="text-sm font-black text-brand">$<?= number_format($row['totalPrice'], 2) ?></p></div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endwhile; ?>
+                <?php else: ?>
+                    <div class="bg-white p-20 rounded-[3rem] text-center border-2 border-dashed border-slate-200">
+                        <i class="bi bi-journal-x text-5xl text-slate-200 mb-4 block"></i>
+                        <p class="text-slate-400 font-bold uppercase tracking-widest">No Bookings Found</p>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <div id="tab-profile" class="tab-content hidden">
+                <form action="" method="POST" enctype="multipart/form-data" class="bg-white p-12 rounded-[3rem] border shadow-sm max-w-4xl">
+                    <h2 class="text-2xl font-black mb-10">Profile Settings</h2>
+                    <div class="flex items-center gap-10 mb-12">
+                        <img src="<?= $profilePic ?>" 
+     class="w-16 h-16 rounded-2xl object-cover border-4 border-white shadow-md"
+     alt="User Profile"
+     onerror="this.src='https://cdn-icons-png.flaticon.com/512/3135/3135715.png'">
                         <div>
-                            <p class="text-sm font-bold leading-none">Alex Rivera</p>
-                            <p class="text-[10px] text-slate-400 font-medium uppercase">Platinum Member</p>
+                            <input type="file" name="profile_img" class="text-xs font-bold text-slate-400 mb-2 block">
+                            <input type="hidden" name="current_profile" value="<?= $user['profile'] ?>">
+                            <p class="text-[10px] text-slate-400 uppercase font-bold tracking-widest">JPG or PNG. Max 2MB</p>
                         </div>
                     </div>
-                </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div><label class="text-[10px] font-black text-slate-300 uppercase mb-2 block">First Name</label><input type="text" name="FName" value="<?= htmlspecialchars($user['FName']) ?>" class="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold"></div>
+                        <div><label class="text-[10px] font-black text-slate-300 uppercase mb-2 block">Last Name</label><input type="text" name="LName" value="<?= htmlspecialchars($user['LName']) ?>" class="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold"></div>
+                        <div class="col-span-2"><label class="text-[10px] font-black text-slate-300 uppercase mb-2 block">Address</label><textarea name="address" rows="3" class="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold"><?= htmlspecialchars($user['address']) ?></textarea></div>
+                        <div class="col-span-2"><label class="text-[10px] font-black text-slate-300 uppercase mb-2 block">Phone</label><input type="text" name="phone" value="<?= htmlspecialchars($user['phone']) ?>" class="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold"></div>
+                    </div>
+                    <button type="submit" name="update_profile" class="mt-10 bg-dark text-white px-12 py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition">Save Changes</button>
+                </form>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-                <div class="glass-card p-6 rounded-[2rem] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="p-3 bg-blue-100 text-brand rounded-2xl text-xl"><i class="bi bi-airplane-engines"></i></div>
-                        <span class="text-xs font-bold text-green-500 bg-green-100 px-2 py-1 rounded-lg">+12%</span>
-                    </div>
-                    <p class="text-slate-500 text-sm font-medium">Total Bookings</p>
-                    <h3 class="text-2xl font-extrabold mt-1">1,284</h3>
-                </div>
-                <div class="glass-card p-6 rounded-[2rem] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="p-3 bg-purple-100 text-purple-600 rounded-2xl text-xl"><i class="bi bi-credit-card"></i></div>
-                        <span class="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">Stable</span>
-                    </div>
-                    <p class="text-slate-500 text-sm font-medium">Total Spent</p>
-                    <h3 class="text-2xl font-extrabold mt-1">$42,950</h3>
-                </div>
-                <div class="glass-card p-6 rounded-[2rem] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="p-3 bg-orange-100 text-orange-600 rounded-2xl text-xl"><i class="bi bi-star"></i></div>
-                        <span class="text-xs font-bold text-green-500 bg-green-100 px-2 py-1 rounded-lg">+5%</span>
-                    </div>
-                    <p class="text-slate-500 text-sm font-medium">User Rating</p>
-                    <h3 class="text-2xl font-extrabold mt-1">4.9 / 5</h3>
-                </div>
-                <div class="glass-card p-6 rounded-[2rem] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="p-3 bg-teal-100 text-teal-600 rounded-2xl text-xl"><i class="bi bi-headset"></i></div>
-                        <span class="text-xs font-bold text-red-500 bg-red-100 px-2 py-1 rounded-lg">-2m</span>
-                    </div>
-                    <p class="text-slate-500 text-sm font-medium">Response Time</p>
-                    <h3 class="text-2xl font-extrabold mt-1">14 Mins</h3>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div class="lg:col-span-2 glass-card rounded-[2.5rem] p-8 shadow-sm">
-                    <div class="flex items-center justify-between mb-8">
-                        <h3 class="text-xl font-extrabold">Recent Itineraries</h3>
-                        <button class="text-brand font-bold text-sm hover:underline underline-offset-4">View All</button>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left">
-                            <thead>
-                                <tr class="text-slate-400 text-xs uppercase tracking-widest font-bold">
-                                    <th class="pb-4">Destination</th>
-                                    <th class="pb-4">Date</th>
-                                    <th class="pb-4">Status</th>
-                                    <th class="pb-4 text-right">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                <?php
-                                $trips = [
-                                    ['Paris, FR', 'May 12, 2026', 'Confirmed', 'text-green-500', 'bg-green-50'],
-                                    ['Bali, ID', 'June 05, 2026', 'Pending', 'text-orange-500', 'bg-orange-50'],
-                                    ['Tokyo, JP', 'Aug 20, 2026', 'In Review', 'text-blue-500', 'bg-blue-50']
-                                ];
-                                foreach($trips as $trip):
-                                ?>
-                                <tr class="group hover:bg-slate-50/50 transition">
-                                    <td class="py-4 font-bold text-slate-700"><?= $trip[0] ?></td>
-                                    <td class="py-4 text-sm text-slate-500 font-medium"><?= $trip[1] ?></td>
-                                    <td class="py-4">
-                                        <span class="<?= $trip[4] ?> <?= $trip[3] ?> text-[10px] font-extrabold px-3 py-1 rounded-full uppercase"><?= $trip[2] ?></span>
-                                    </td>
-                                    <td class="py-4 text-right">
-                                        <button class="p-2 hover:bg-white rounded-xl shadow-sm border opacity-0 group-hover:opacity-100 transition"><i class="bi bi-three-dots"></i></button>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div class="glass-card rounded-[2.5rem] p-8 shadow-sm">
-                    <h3 class="text-xl font-extrabold mb-6">Exclusive Offers</h3>
+            <div id="tab-payment" class="tab-content hidden space-y-10">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
                     <div class="space-y-6">
-                        <div class="relative group cursor-pointer overflow-hidden rounded-3xl h-40">
-                            <img src="https://images.unsplash.com/photo-1540541338287-41700207dee6?auto=format&fit=crop&w=400" class="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition duration-500">
-                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex flex-col justify-end p-5">
-                                <p class="text-white font-bold text-lg leading-tight">Beach Resorts</p>
-                                <p class="text-white/70 text-sm">Save up to 40%</p>
+                        <h2 class="text-2xl font-black italic">Payment Method</h2>
+                        <div class="relative h-56 w-full rounded-[2.5rem] bg-slate-900 p-8 text-white shadow-2xl overflow-hidden group">
+                            <div class="relative z-10 h-full flex flex-col justify-between">
+                                <div class="flex justify-between items-start">
+                                    <i class="bi bi-chip text-4xl text-yellow-500/80"></i>
+                                    <h4 class="font-black italic text-xl"><?= htmlspecialchars($payment['paymentType'] ?? 'Card') ?></h4>
+                                </div>
+                                <div class="space-y-1">
+                                    <p class="text-[10px] uppercase tracking-[0.3em] text-slate-500 font-bold">Card Number</p>
+                                    <p class="text-2xl font-mono tracking-widest">
+                                        <?= !empty($payment['cardCode']) ? '•••• •••• •••• ' . substr($payment['cardCode'], -4) : '•••• •••• •••• ••••' ?>
+                                    </p>
+                                </div>
+                                <div class="flex justify-between items-end">
+                                    <div>
+                                        <p class="text-[10px] uppercase text-slate-500 font-bold">Card Holder</p>
+                                        <p class="font-bold uppercase"><?= htmlspecialchars($user['FName'] . ' ' . $user['LName']) ?></p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-[10px] uppercase text-slate-500 font-bold">Expires</p>
+                                        <p class="font-bold"><?= !empty($payment['expireDate']) ? date('m/y', strtotime($payment['expireDate'])) : 'MM/YY' ?></p>
+                                    </div>
+                                </div>
                             </div>
+                            <div class="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-blue-600/10 transition-transform duration-700"></div>
                         </div>
-                        <div class="relative group cursor-pointer overflow-hidden rounded-3xl h-40">
-                            <img src="https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=400" class="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition duration-500">
-                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex flex-col justify-end p-5">
-                                <p class="text-white font-bold text-lg leading-tight">Luxury Suites</p>
-                                <p class="text-white/70 text-sm">Members Exclusive</p>
+
+                        <form action="" method="POST" class="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-5">
+                            <input type="hidden" name="userID" value="<?= $userID ?>">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="col-span-2">
+                                    <label class="text-[10px] font-black text-slate-400 uppercase mb-2 block ml-2">Provider</label>
+                                    <select name="paymentType" class="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold focus:ring-2 focus:ring-brand">
+                                        <option value="Visa" <?= (($payment['paymentType']??'') == 'Visa' ? 'selected' : '') ?>>Visa</option>
+                                        <option value="Mastercard" <?= (($payment['paymentType']??'') == 'Mastercard' ? 'selected' : '') ?>>Mastercard</option>
+                                    </select>
+                                </div>
+                                <div class="col-span-2">
+                                    <label class="text-[10px] font-black text-slate-400 uppercase mb-2 block ml-2">Card Number</label>
+                                    <input type="text" name="cardCode" maxlength="16" placeholder="0000 0000 0000 0000" value="<?= htmlspecialchars($payment['cardCode']??'') ?>" class="w-full bg-slate-50 border-none rounded-2xl p-4 font-black tracking-widest">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-black text-slate-400 uppercase mb-2 block ml-2">Expiry Date</label>
+                                    <input type="date" name="expireDate" value="<?= $payment['expireDate']??'' ?>" class="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-black text-slate-400 uppercase mb-2 block ml-2">CVV</label>
+                                    <input type="password" name="cvv" maxlength="3" placeholder="***" value="<?= htmlspecialchars($payment['cvv']??'') ?>" class="w-full bg-slate-50 border-none rounded-2xl p-4 font-bold">
+                                </div>
+                            </div>
+                            <button type="submit" name="update_payment" class="w-full bg-brand text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-600 transition shadow-lg mt-4">
+                                Update Payment Method
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="space-y-6">
+                        <h2 class="text-2xl font-black italic">Billing Security</h2>
+                        <div class="bg-blue-600 rounded-[2.5rem] p-10 text-white shadow-xl relative overflow-hidden">
+                            <div class="relative z-10">
+                                <div class="h-12 w-12 bg-white/20 rounded-xl flex items-center justify-center mb-6">
+                                    <i class="bi bi-shield-lock-fill text-2xl"></i>
+                                </div>
+                                <h3 class="text-xl font-bold mb-2">Encrypted Transactions</h3>
+                                <p class="text-blue-100 text-sm leading-relaxed">
+                                    Your payment security is our priority. We use 256-bit SSL encryption to ensure that your credit card details are handled safely.
+                                </p>
                             </div>
                         </div>
                     </div>
-                    <button class="w-full mt-6 py-4 border-2 border-slate-200 rounded-2xl font-bold text-slate-600 hover:border-brand hover:text-brand transition">Show All Deals</button>
                 </div>
             </div>
-
         </main>
     </div>
-
-    <script>
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            sidebar.classList.toggle('-translate-x-full');
-        }
-    </script>
 </body>
 </html>

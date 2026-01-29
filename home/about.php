@@ -41,7 +41,7 @@
             </a>
             <div class="hidden md:flex space-x-8 font-bold text-slate-600">
                 <a href="index.php" class="hover:text-brand transition">Home</a>
-                <a href="view_all.php" class="hover:text-brand transition">Explore</a>
+                <a href="viewAllProduct.php" class="hover:text-brand transition">Explore</a>
                 <a href="about.php" class="text-brand">About</a>
             </div>
             <a href="contact.php" class="bg-dark text-white px-6 py-2 rounded-full font-bold text-sm hover:bg-brand transition-all">Contact Us</a>
@@ -151,12 +151,76 @@
         </div>
     </section>
 
-    <footer class="bg-dark text-white pt-20 pb-10">
-        <div class="container mx-auto px-6 text-center">
-            <a href="#" class="text-2xl font-extrabold text-brand mb-6 block">BookingMaster</a>
-            <p class="text-slate-500 text-sm">&copy; 2026 BookingMaster International. Proudly made for explorers.</p>
+    <footer class="bg-slate-900 text-slate-300 pt-20 pb-10">
+    <div class="container mx-auto px-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
+            
+            <div class="space-y-6">
+                <a href="index.php" class="flex items-center gap-3 text-white text-2xl font-extrabold italic">
+                    <div class="bg-blue-600 p-2 rounded-xl shadow-lg shadow-blue-500/20">
+                        <i class="bi bi-geo-alt-fill"></i>
+                    </div>
+                    <span>BookingMaster</span>
+                </a>
+                <p class="text-sm leading-relaxed">
+                    Discover your next adventure with BookingMaster. We provide seamless booking experiences for the world's most beautiful destinations.
+                </p>
+                <div class="flex gap-4">
+                    <a href="#" class="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all">
+                        <i class="bi bi-facebook"></i>
+                    </a>
+                    <a href="#" class="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all">
+                        <i class="bi bi-instagram"></i>
+                    </a>
+                    <a href="#" class="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all">
+                        <i class="bi bi-twitter-x"></i>
+                    </a>
+                </div>
+            </div>
+
+            <div>
+                <h4 class="text-white font-bold mb-6 uppercase text-xs tracking-widest">Explore</h4>
+                <ul class="space-y-4 text-sm font-medium">
+                    <li><a href="viewAllProduct.php" class="hover:text-blue-500 transition">All Destinations</a></li>
+                    <li><a href="#" class="hover:text-blue-500 transition">Special Offers</a></li>
+                    <li><a href="#" class="hover:text-blue-500 transition">Travel Guides</a></li>
+                    <li><a href="#" class="hover:text-blue-500 transition">Travel Insurance</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <h4 class="text-white font-bold mb-6 uppercase text-xs tracking-widest">Support</h4>
+                <ul class="space-y-4 text-sm font-medium">
+                    <li><a href="userDashboard.php" class="hover:text-blue-500 transition">Your Account</a></li>
+                    <li><a href="#" class="hover:text-blue-500 transition">Help Center</a></li>
+                    <li><a href="#" class="hover:text-blue-500 transition">Terms of Service</a></li>
+                    <li><a href="#" class="hover:text-blue-500 transition">Privacy Policy</a></li>
+                </ul>
+            </div>
+
+            <div>
+                <h4 class="text-white font-bold mb-6 uppercase text-xs tracking-widest">Stay Updated</h4>
+                <p class="text-sm mb-6">Subscribe to get the latest destination deals and travel tips.</p>
+                <form class="space-y-3">
+                    <input type="email" placeholder="Email address" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition">
+                    <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-lg shadow-blue-500/20">
+                        Subscribe
+                    </button>
+                </form>
+            </div>
         </div>
-    </footer>
+
+        <div class="pt-10 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
+            <p class="text-xs font-medium text-slate-500">
+                &copy; <?= date('Y') ?> BookingMaster POS. All rights reserved.
+            </p>
+            <div class="flex items-center gap-6">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" class="h-4 opacity-50 grayscale hover:grayscale-0 transition">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" class="h-6 opacity-50 grayscale hover:grayscale-0 transition">
+            </div>
+        </div>
+    </div>
+</footer>
 
 </body>
 </html>

@@ -1,3 +1,31 @@
+<?php
+session_start();
+include '../../admin/config.php'; // Fixed the space error
+
+$error_msg = "";
+
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $email = $_POST['email'];
+    $password = $_POST['password'];
+
+    $check_stmt = $conn->prepare("SELECT email FROM account WHERE email = ?");
+    $check_stmt->bind_param("s", $email);
+    $check_stmt->execute();
+    if ($check_stmt->get_result()->num_rows > 0) {
+        $error_msg = "This email is already registered.";
+    } else {
+        $stmt = $conn->prepare("INSERT INTO account (email, password) VALUES (?, ?)");
+        $stmt->bind_param("ss", $email, $password);
+        if ($stmt->execute()) {
+            $_SESSION['user_email'] = $email; // Store email for the next page
+            header("Location: infoGrabber.php");
+            exit();
+        } else {
+            $error_msg = "Database error.";
+        }
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,74 +40,54 @@
         tailwind.config = {
             theme: {
                 extend: {
-                    fontFamily: {
-                        sans: ['Plus Jakarta Sans', 'sans-serif'],
-                    },
-                    colors: {
-                        brand: '#3B82F6',
-                        dark: '#0F172A',
-                    }
+                    fontFamily: { sans: ['Plus Jakarta Sans', 'sans-serif'] },
+                    colors: { brand: '#3B82F6', dark: '#0F172A' }
                 }
             }
         }
     </script>
     <style>
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-        .bg-image {
-            background: linear-gradient(rgba(15, 23, 42, 0.5), rgba(15, 23, 42, 0.5)), 
-                        url('https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1920');
-            background-size: cover;
-            background-position: center;
-        }
-        /* Smooth transition for floating labels */
-        .floating-label:focus-within label,
-        .floating-label input:not(:placeholder-shown) + label {
-            transform: translateY(-1.5rem) scale(0.85);
-            color: #3B82F6;
-        }
+        .glass-panel { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }
+        .bg-image { background: linear-gradient(rgba(15, 23, 42, 0.5), rgba(15, 23, 42, 0.5)), url('https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1920'); background-size: cover; background-position: center; }
+        .floating-label:focus-within label, .floating-label input:not(:placeholder-shown) + label { transform: translateY(-1.5rem) scale(0.85); color: #3B82F6; }
     </style>
 </head>
 <body class="bg-dark font-sans antialiased">
 
     <div class="bg-image min-h-screen flex items-center justify-center p-6">
-        
         <div class="glass-panel w-full max-w-md rounded-[2.5rem] p-8 md:p-10 shadow-2xl relative overflow-hidden">
             
             <div class="text-center mb-8">
-                <div class="inline-flex items-center justify-center w-14 h-14 bg-brand/10 text-brand rounded-2xl mb-4">
-                    <i class="bi bi-person-plus-fill text-2xl"></i>
-                </div>
+                <a href="../../home/">
+                    <div class="inline-flex items-center justify-center w-14 h-14 bg-brand/10 text-brand rounded-2xl mb-4">
+                        <i class="bi bi-person-plus-fill text-2xl"></i>
+                    </div>
+                </a>
                 <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">Create Account</h2>
                 <p class="text-slate-500 mt-2 font-medium">Join BookingMaster to start your journey</p>
+                <?php if($error_msg): ?>
+                    <p class="text-red-500 text-sm mt-2 bg-red-50 p-2 rounded-lg"><?php echo $error_msg; ?></p>
+                <?php endif; ?>
             </div>
 
-            <form id="registrationForm" class="space-y-5">
+            <form id="registrationForm" class="space-y-5" method="POST" >
                 
                 <div class="relative floating-label">
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                         <i class="bi bi-envelope"></i>
                     </div>
-                    <input type="email" id="email" placeholder=" " required
+                    <input type="email" id="email" name="email" placeholder=" " required
                         class="block w-full pl-11 pr-4 py-3.5 bg-white/50 border border-slate-200 rounded-2xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all peer">
-                    <label for="email" class="absolute left-11 top-3.5 text-slate-400 pointer-events-none transition-all origin-left">
-                        Email Address
-                    </label>
+                    <label for="email" class="absolute left-11 top-3.5 text-slate-400 pointer-events-none transition-all origin-left">Email Address</label>
                 </div>
 
                 <div class="relative floating-label">
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                         <i class="bi bi-lock"></i>
                     </div>
-                    <input type="password" id="password" placeholder=" " required
+                    <input type="password" id="password" name="password" placeholder=" " required
                         class="block w-full pl-11 pr-12 py-3.5 bg-white/50 border border-slate-200 rounded-2xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all peer">
-                    <label for="password" class="absolute left-11 top-3.5 text-slate-400 pointer-events-none transition-all origin-left">
-                        Password
-                    </label>
+                    <label for="password" class="absolute left-11 top-3.5 text-slate-400 pointer-events-none transition-all origin-left">Password</label>
                     <button type="button" onclick="togglePassword('password', 'eyeIcon1')" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-brand transition">
                         <i id="eyeIcon1" class="bi bi-eye"></i>
                     </button>
@@ -91,9 +99,7 @@
                     </div>
                     <input type="password" id="confirmPassword" placeholder=" " required
                         class="block w-full pl-11 pr-12 py-3.5 bg-white/50 border border-slate-200 rounded-2xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all peer">
-                    <label for="confirmPassword" class="absolute left-11 top-3.5 text-slate-400 pointer-events-none transition-all origin-left">
-                        Confirm Password
-                    </label>
+                    <label for="confirmPassword" class="absolute left-11 top-3.5 text-slate-400 pointer-events-none transition-all origin-left">Confirm Password</label>
                     <button type="button" onclick="togglePassword('confirmPassword', 'eyeIcon2')" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-brand transition">
                         <i id="eyeIcon2" class="bi bi-eye"></i>
                     </button>
@@ -112,41 +118,22 @@
                 </button>
             </form>
 
-            <div class="relative my-8">
-                <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div>
-                <div class="relative flex justify-center text-sm"><span class="px-4 bg-white/80 rounded-full text-slate-400 font-medium">Or sign up with</span></div>
-            </div>
-
-            <div class="grid grid-cols-3 gap-4">
-                <button class="flex justify-center py-3 bg-white border border-slate-200 rounded-2xl hover:bg-gray-50 hover:border-brand/30 transition shadow-sm">
-                    <i class="bi bi-google text-red-500"></i>
-                </button>
-                <button class="flex justify-center py-3 bg-white border border-slate-200 rounded-2xl hover:bg-gray-50 hover:border-brand/30 transition shadow-sm">
-                    <i class="bi bi-facebook text-blue-600"></i>
-                </button>
-                <button class="flex justify-center py-3 bg-white border border-slate-200 rounded-2xl hover:bg-gray-50 hover:border-brand/30 transition shadow-sm">
-                    <i class="bi bi-apple text-black"></i>
-                </button>
-            </div>
-
             <p class="text-center mt-8 text-slate-500 font-medium">
-                Already have an account? 
-                <a href="login.php" class="text-brand font-bold hover:underline ml-1">Log in</a>
+                Already have an account? <a href="../login/" class="text-brand font-bold hover:underline ml-1">Log in</a>
             </p>
 
-            <div id="successOverlay" class="hidden absolute inset-0 bg-white flex flex-col items-center justify-center text-center p-8 z-50">
+            <div id="successOverlay" class="<?php echo $success ? '' : 'hidden'; ?> absolute inset-0 bg-white flex flex-col items-center justify-center text-center p-8 z-50">
                 <div class="w-20 h-20 bg-green-100 text-green-500 rounded-full flex items-center justify-center text-4xl mb-6 animate-bounce">
                     <i class="bi bi-check-lg"></i>
                 </div>
                 <h3 class="text-2xl font-bold text-slate-900">Account Created!</h3>
-                <p class="text-slate-500 mt-2">Setting up your dashboard...</p>
+                <p class="text-slate-500 mt-2">Redirecting to login...</p>
             </div>
 
         </div>
     </div>
 
     <script>
-        // Professional Password Toggle
         function togglePassword(inputId, iconId) {
             const pwd = document.getElementById(inputId);
             const icon = document.getElementById(iconId);
@@ -159,34 +146,30 @@
             }
         }
 
-        // Professional Form Handling
         document.getElementById('registrationForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const btn = document.getElementById('submitBtn');
-            const loader = document.getElementById('loader');
-            const success = document.getElementById('successOverlay');
-
-            // Basic Validation Check
             const pass = document.getElementById('password').value;
             const confirm = document.getElementById('confirmPassword').value;
 
             if (pass !== confirm) {
+                e.preventDefault();
                 alert("Passwords do not match!");
                 return;
             }
 
-            // Provide immediate visual feedback
+            // Show UI feedback, then allow standard form submission to PHP
+            const btn = document.getElementById('submitBtn');
+            const loader = document.getElementById('loader');
             btn.disabled = true;
-            btn.querySelector('span').innerText = 'Creating Account...';
+            btn.querySelector('span').innerText = 'Processing...';
             loader.classList.remove('hidden');
-
-            // Simulate API Network Request
-            setTimeout(() => {
-                success.classList.remove('hidden');
-                // Optional: Redirect after success
-                // window.location.href = 'index.php'; 
-            }, 1800);
         });
+
+        // Redirect if success overlay is visible
+        <?php if($success): ?>
+        setTimeout(() => {
+            window.location.href = '../login/'; 
+        }, 2000);
+        <?php endif; ?>
     </script>
 </body>
 </html>
