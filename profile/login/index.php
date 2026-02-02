@@ -26,7 +26,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login_action'])) {
         // 3. Conditional Redirection based on Permission
         if ($user['permission'] === 'admin') {
             // Redirect to Admin Dashboard
-            header("Location: ../../admin/dashboard/dashboard.php");
+            header("Location: ../../admin/index.php");
         } else {
             // Redirect to Customer Homepage
             header("Location: ../../home/index.php");

@@ -1,10 +1,12 @@
 <?php
 session_start();
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 include '../../admin/config.php'; // Ensure this defines $conn
 
 // Redirect back if they haven't come from the registration page
 if (!isset($_SESSION['user_email'])) {
-    header("Location: ../../home/index.php");
+    header("Location: index.php");
     exit();
 }
 
@@ -29,25 +31,28 @@ if (isset($_POST['btnadd'])) {
     $address = $_POST['address'];
     $createdDate = date('Y-m-d');
 
-    // 3. Handle Image Upload (mapping to 'profile' column in SQL)
-    $profile_pic = "default.png";
-    if (!empty($_FILES['pfp']['name'])) {
-        $profile_pic = time() . '_' . $_FILES['pfp']['name'];
-        // Ensure this directory exists and is writable
-        move_uploaded_file($_FILES['pfp']['tmp_name'], "../../uploads/" . $profile_pic);
-    }
+// 3. Handle Image Upload
+$profile_pic = "default.png";
+if (!empty($_FILES['pfp']['name'])) {
+    $profile_pic = time() . '_' . $_FILES['pfp']['name'];
+    move_uploaded_file($_FILES['pfp']['tmp_name'], "../../database/imgs/" . $profile_pic);
+}
 
-    // 4. Insert into userinfo table
-    // Note: accountID is a UNIQUE foreign key in your schema
-    $stmt = $conn->prepare("INSERT INTO userinfo (accountID, FName, LName, gender, DOB, phone, email, createdDate, profile, address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("isssssssss", $accountID, $fname, $lname, $gender, $dob, $phone, $user_email, $createdDate, $profile_pic, $address);
+// 4. Insert into userinfo table (REMOVED 'email' column)
+$stmt = $conn->prepare("INSERT INTO userinfo (accountID, FName, LName, gender, DOB, phone, createdDate, profile, address) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
-    if ($stmt->execute()) {
-        header("Location: ../../home/index.php"); // Forward to home.php as requested
-        exit();
-    } else {
-        $error_msg = "Error saving profile details: " . $conn->error;
-    }
+// Updated types: 9 placeholders = "issssssss"
+$stmt->bind_param("issssssss", $accountID, $fname, $lname, $gender, $dob, $phone, $createdDate, $profile_pic, $address);
+
+if ($stmt->execute()) {
+        // 2. Store session data
+        $_SESSION['accountID'] = $accountID;
+    header("Location: ../../home/index.php");
+    exit();
+} else {
+    // Helpful for debugging if another issue arises
+    die("Execution failed: " . $stmt->error);
+}
 }
 ?>
 <!DOCTYPE html>

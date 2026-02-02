@@ -26,16 +26,16 @@ INSERT INTO `account` (`email`, `password`, `permission`) VALUES
 
 -- 3. SPOT DATA (10 Records)
 INSERT INTO `spot` (`name`, `type`, `status`, `phone`, `addressID`, `detail`, `price`, `discount`, `photo`) VALUES
-('Ha Long Bay Cruise', 'Tour', 'Open', '+84-24-3926', 1, 'Overnight cruise among limestone karsts.', 150.00, 15.00, 'halong.jpg'),
-('Fansipan Legend', 'Mountain', 'Open', '+84-214-381', 2, 'Cable car to the highest peak in Indochina.', 35.00, 0.00, 'fansipan.png'),
+('Ha Long Bay Cruise', 'Tour', 'Available', '+84-24-3926', 1, 'Overnight cruise among limestone karsts.', 150.00, 15.00, 'halong.jpg'),
+('Fansipan Legend', 'Mountain', 'Available', '+84-214-381', 2, 'Cable car to the highest peak in Indochina.', 35.00, 0.00, 'fansipan.png'),
 ('Patong Beach Resort', 'Hotel', 'Available', '+66-76-340', 3, 'Beachfront accommodation in Phuket.', 120.00, 20.00, 'patong.jpg'),
-('Doi Suthep Temple', 'Temple', 'Open', '+66-53-295', 4, 'Sacred mountain temple overlooking Chiang Mai.', 5.00, 0.00, 'doisuthep.jpg'),
-('Kuta Surf School', 'Activity', 'Open', '+62-361-751', 5, 'Beginner surfing lessons in Bali.', 45.00, 5.00, 'surf.jpg'),
-('Gili Trawangan Tour', 'Island', 'Open', '+62-370-693', 6, 'Speedboat trip to the Gili islands.', 60.00, 0.00, 'gili.jpg'),
-('Angkor Night Market', 'Shopping', 'Open', '+855-63-966', 7, 'Traditional crafts and local street food.', 0.00, 0.00, 'market.jpg'),
-('Batu Caves Tour', 'Culture', 'Open', '+60-3-6189', 8, 'Iconic rainbow stairs and limestone caves.', 2.00, 0.00, 'batu.jpg'),
-('El Nido Island Hopping', 'Tour', 'Open', '+63-48-433', 9, 'Visit Big Lagoon and Secret Beach.', 30.00, 2.00, 'elnido.jpg'),
-('Marina Bay Sands Deck', 'Landmark', 'Open', '+65-6688', 10, 'Observation deck with city skyline views.', 25.00, 0.00, 'mbs.jpg');
+('Doi Suthep Temple', 'Temple', 'Available', '+66-53-295', 4, 'Sacred mountain temple overlooking Chiang Mai.', 5.00, 0.00, 'doisuthep.jpg'),
+('Kuta Surf School', 'Activity', 'Available', '+62-361-751', 5, 'Beginner surfing lessons in Bali.', 45.00, 5.00, 'surf.jpg'),
+('Gili Trawangan Tour', 'Island', 'Available', '+62-370-693', 6, 'Speedboat trip to the Gili islands.', 60.00, 0.00, 'gili.jpg'),
+('Angkor Night Market', 'Shopping', 'Available', '+855-63-966', 7, 'Traditional crafts and local street food.', 0.00, 0.00, 'market.jpg'),
+('Batu Caves Tour', 'Culture', 'Available', '+60-3-6189', 8, 'Iconic rainbow stairs and limestone caves.', 2.00, 0.00, 'batu.jpg'),
+('El Nido Island Hopping', 'Tour', 'Available', '+63-48-433', 9, 'Visit Big Lagoon and Secret Beach.', 30.00, 2.00, 'elnido.jpg'),
+('Marina Bay Sands Deck', 'Landmark', 'Available', '+65-6688', 10, 'Observation deck with city skyline views.', 25.00, 0.00, 'mbs.jpg');
 
 -- 4. USERINFO DATA (10 Records)
 -- Removed redundant 'email' column as it is already in the 'account' table
